@@ -3,18 +3,18 @@ export function Modal({ open, onClose, title, children, size = 'md' }) {
   if (!open) return null
   const sizes = { sm: 'max-w-sm', md: 'max-w-lg', lg: 'max-w-2xl', xl: 'max-w-4xl' }
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className={`relative w-full ${sizes[size]} bg-brand-card border border-brand-border rounded-2xl shadow-modal animate-slide-in`}>
+      <div className={`relative flex flex-col w-full max-h-[90vh] ${sizes[size]} bg-brand-card border border-brand-border rounded-2xl shadow-modal animate-slide-in`}>
         {title && (
-          <div className="flex items-center justify-between p-5 border-b border-brand-border">
+          <div className="flex items-center justify-between p-4 sm:p-5 border-b border-brand-border shrink-0">
             <h2 className="font-display text-lg font-semibold text-brand-white">{title}</h2>
             <button onClick={onClose} className="text-brand-muted hover:text-brand-white transition-colors">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
         )}
-        <div className="p-5">{children}</div>
+        <div className="p-4 sm:p-5 overflow-y-auto">{children}</div>
       </div>
     </div>
   )
@@ -95,12 +95,12 @@ export function StatCard({ icon: Icon, label, value, sub, accent = false }) {
 // ─── PageHeader ──────────────────────────────────────────────────────────────
 export function PageHeader({ title, subtitle, actions }) {
   return (
-    <div className="flex items-start justify-between mb-6">
+    <div className="flex items-start justify-between flex-wrap gap-3 mb-6">
       <div>
         <h1 className="page-title">{title}</h1>
         {subtitle && <p className="text-brand-muted text-sm mt-1">{subtitle}</p>}
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions && <div className="flex items-center gap-2 flex-wrap">{actions}</div>}
     </div>
   )
 }

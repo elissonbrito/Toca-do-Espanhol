@@ -120,8 +120,8 @@ python manage.py migrate
 python manage.py seed_data  # Cria usuários e mesas de exemplo
 python manage.py seed_menu  # Cria o cardápio de exemplo já classificado fiscalmente
 
-# Rodar servidor
-python manage.py runserver
+# Rodar servidor (o front e o app mobile já esperam a API em :8001)
+python manage.py runserver 8001
 ```
 
 ### Testes
@@ -148,7 +148,7 @@ cd frontend
 npm install
 
 # Crie .env.local se precisar apontar para API diferente:
-# VITE_API_URL=http://localhost:8000/api
+# VITE_API_URL=http://localhost:8001/api
 
 npm run dev
 ```

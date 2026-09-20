@@ -20,8 +20,8 @@ python manage.py migrate
 python manage.py seed_data
 
 echo ""
-echo "🚀 Iniciando backend em http://localhost:8000 ..."
-python manage.py runserver &
+echo "🚀 Iniciando backend em http://localhost:8001 ..."
+python manage.py runserver 8001 &
 BACKEND_PID=$!
 
 # Frontend
@@ -38,7 +38,7 @@ FRONTEND_PID=$!
 echo ""
 echo "✅ Serviços rodando!"
 echo "   Frontend: http://localhost:5173"
-echo "   Backend:  http://localhost:8000"
+echo "   Backend:  http://localhost:8001"
 echo "   Login:    admin@toca.com / 123456"
 echo ""
 echo "Para encerrar: Ctrl+C"

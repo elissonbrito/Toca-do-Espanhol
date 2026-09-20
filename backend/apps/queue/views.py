@@ -95,6 +95,16 @@ class QueueTicketViewSet(viewsets.ModelViewSet):
         return Response(QueueTicketSerializer(ticket).data)
 
     @action(detail=True, methods=['post'])
+    def call(self, request, pk=None):
+        """Chama esta senha específica, fora da ordem (recepção escolheu na hora)."""
+        ticket = QueueService.call_ticket(self.get_object(), request.user)
+        AuditService.log(
+            user=request.user, action='UPDATE', entity='QueueTicket', entity_id=ticket.id,
+            details=f'Senha {ticket.code} chamada manualmente (fora da ordem)', request=request,
+        )
+        return Response(QueueTicketSerializer(ticket).data)
+
+    @action(detail=True, methods=['post'])
     def finalize(self, request, pk=None):
         ticket = QueueService.set_status(self.get_object(), TicketStatus.FINALIZADO)
         AuditService.log(
