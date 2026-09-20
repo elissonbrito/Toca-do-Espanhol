@@ -25,7 +25,7 @@ export default class ErrorBoundary extends Component {
           {error?.name}: {error?.message}
         </p>
         <pre style={{
-          whiteSpace: 'pre-wrap', background: '#1A1A1A', border: '1px solid #333',
+          whiteSpace: 'pre-wrap', background: '#241A12', border: '1px solid #3C2C1E',
           borderRadius: 8, padding: 16, fontSize: 12, overflow: 'auto', maxHeight: 400,
         }}>
           {error?.stack}

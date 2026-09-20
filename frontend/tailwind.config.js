@@ -5,10 +5,10 @@ export default {
     extend: {
       colors: {
         brand: {
-          black:  '#0A0A0A',
-          dark:   '#111111',
-          card:   '#1A1A1A',
-          border: '#2A2A2A',
+          black:  '#130D09',
+          dark:   '#1B130D',
+          card:   '#241A12',
+          border: '#3C2C1E',
           red:    '#8B1A1A',
           'red-light': '#B22222',
           'red-hover': '#A01F1F',

@@ -20,8 +20,8 @@ python manage.py migrate
 python manage.py seed_data
 
 echo ""
-echo "🚀 Iniciando backend em http://localhost:8001 ..."
-python manage.py runserver 8001 &
+echo "🚀 Iniciando backend em http://localhost:8001 (e na rede local, p/ o app mobile) ..."
+python manage.py runserver 0.0.0.0:8001 &
 BACKEND_PID=$!
 
 # Frontend
