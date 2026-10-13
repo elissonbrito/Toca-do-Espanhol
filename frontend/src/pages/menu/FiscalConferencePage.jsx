@@ -204,8 +204,8 @@ export default function FiscalConferencePage() {
                     <td className="p-2 text-right text-brand-white">R$ {Number(inv.valor_total).toFixed(2)}</td>
                     <td className="p-2">
                       <div className="flex items-center gap-2 justify-end">
-                        <a href={fiscalAPI.xmlUrl(inv.id)} target="_blank" rel="noreferrer"
-                          className="text-brand-muted hover:text-brand-gold" title="Baixar XML"><Download size={15} /></a>
+                        <button type="button" onClick={() => fiscalAPI.downloadXml(inv.id).catch(() => toast.error('Erro ao baixar o XML'))}
+                          className="text-brand-muted hover:text-brand-gold" title="Baixar XML"><Download size={15} /></button>
                         <button disabled={busy} onClick={() => act(fiscalAPI.sign, inv.id, 'Assinar')}
                           className="text-brand-muted hover:text-brand-gold" title="Assinar"><PenLine size={15} /></button>
                         <button disabled={busy} onClick={() => act(fiscalAPI.transmit, inv.id, 'Transmitir')}

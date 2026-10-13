@@ -9,6 +9,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from apps.tables.models import TableStatus
+from apps.utils import parse_id
 from .models import Order, OrderItem, OrderStatus, ItemStatus
 
 CLOSED_STATUSES = {OrderStatus.FINALIZADO, OrderStatus.CANCELADO}
@@ -162,11 +163,17 @@ class OrderService:
         """Transfere itens selecionados de uma comanda para outra e recalcula ambas."""
         if source_order.pk == target_order.pk:
             raise ValidationError('Comanda de origem e destino são a mesma.')
+        # Conta já paga/cancelada não pode ter o total alterado.
+        if source_order.status in CLOSED_STATUSES:
+            raise ValidationError('A comanda de origem está encerrada — não cede itens.')
+        if not isinstance(item_ids, (list, tuple)):
+            raise ValidationError({'items': 'Envie a lista de ids dos itens.'})
+        item_ids = [i for i in map(parse_id, item_ids) if i is not None]
         if target_order.status in LOCKED_FOR_ITEMS:
             raise ValidationError('A comanda de destino está fechada — não aceita itens.')
 
         items = list(
-            source_order.items.filter(pk__in=item_ids or [])
+            source_order.items.filter(pk__in=item_ids)
             .exclude(status=ItemStatus.CANCELADO)
         )
         if not items:

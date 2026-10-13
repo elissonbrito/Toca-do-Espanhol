@@ -13,16 +13,38 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-change-me')
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',')
+SECRET_KEY = os.environ.get('SECRET_KEY', '')
+if not SECRET_KEY:
+    if not DEBUG:
+        from django.core.exceptions import ImproperlyConfigured
+        raise ImproperlyConfigured('Defina SECRET_KEY (obrigatória com DEBUG=False).')
+    SECRET_KEY = 'django-insecure-somente-dev'
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', '').split(',') if h.strip()]
 
 # Django exige o Origin em CSRF_TRUSTED_ORIGINS para POSTs no admin sob HTTPS.
-CSRF_TRUSTED_ORIGINS = [f'https://{h}' for h in ALLOWED_HOSTS if h]
+CSRF_TRUSTED_ORIGINS = [f'https://{h}' for h in ALLOWED_HOSTS]
 
-# Atrás do proxy HTTPS do Render.
+# Atrás de proxy reverso HTTPS (nginx/Caddy). O proxy deve sobrescrever estes cabeçalhos.
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
+
+# Endurecimento HTTP — só em produção (DEBUG=False).
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_HTTPONLY = True
+    SECURE_HSTS_SECONDS = int(os.environ.get('SECURE_HSTS_SECONDS', '31536000'))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = 'same-origin'
+    X_FRAME_OPTIONS = 'DENY'
+    # O proxy já redireciona http->https; ligue aqui se não houver proxy.
+    SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'False') == 'True'
+    SECURE_REDIRECT_EXEMPT = [r'^health/$']
+
+# Caminho do admin do Django configurável (dificulta varredura automática).
+ADMIN_URL = os.environ.get('ADMIN_URL', 'admin/').strip('/') + '/'
 
 # Application definition
 DJANGO_APPS = [
@@ -92,7 +114,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-# Database — DATABASE_URL (Render injeta automaticamente; local vem do .env).
+# Database — DATABASE_URL (produção: Postgres na VM Oracle; local vem do .env).
 DATABASES = {
     'default': dj_database_url.config(
         default=os.environ.get('DATABASE_URL'),
@@ -133,10 +155,37 @@ STORAGES = {
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Cache compartilhado entre os workers do gunicorn (o throttling depende dele;
+# LocMem seria por processo e multiplicaria o limite pelo nº de workers).
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'django_cache',
+    }
+}
+
+# Limite de upload/corpo de requisição (a API só trafega JSON pequeno).
+DATA_UPLOAD_MAX_MEMORY_SIZE = 2 * 1024 * 1024
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {'console': {'class': 'logging.StreamHandler'}},
+    'root': {'handlers': ['console'], 'level': 'WARNING'},
+    'loggers': {
+        'django.security': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+    },
+}
+
 # REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PARSER_CLASSES': (
+        'apps.utils.ObjectJSONParser',
+        'rest_framework.parsers.FormParser',
+        'rest_framework.parsers.MultiPartParser',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
@@ -153,9 +202,15 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.UserRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/hour',
-        'user': '1000/hour',
+        'user': os.environ.get('THROTTLE_USER', '300/min'),  # telas fazem polling a cada 4-5 s
+        'anon': os.environ.get('THROTTLE_ANON', '120/min'),
+        # Força bruta no login: por IP e por e-mail.
+        'login': os.environ.get('THROTTLE_LOGIN', '10/min'),
+        'login_email': os.environ.get('THROTTLE_LOGIN_EMAIL', '20/hour'),
+        'refresh': os.environ.get('THROTTLE_REFRESH', '60/min'),
     },
+    # Atrás de 1 proxy (nginx/Caddy): usa o último IP do X-Forwarded-For.
+    'NUM_PROXIES': int(os.environ.get('NUM_PROXIES', '1')),
 }
 
 # JWT

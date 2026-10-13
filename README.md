@@ -14,6 +14,8 @@ Sistema ERP completo para gerenciamento operacional do restaurante Toca do Espan
 - [Estrutura do Projeto](#estrutura-do-projeto)
 - [API Endpoints](#api-endpoints)
 - [Credenciais Padrão](#credenciais-padrão)
+- [Segurança](#segurança)
+- [Produção (VM Oracle Always Free)](#️-produção-vm-oracle-always-free)
 
 ---
 
@@ -311,7 +313,7 @@ GET    /api/audit/             → Logs, read-only (filtro por ação/entidade/u
 
 ## 🔑 Credenciais Padrão
 
-Geradas automaticamente pelo comando `seed_data`:
+Geradas pelo comando `seed_data` **somente em desenvolvimento** (`DEBUG=True`):
 
 | Email | Senha | Perfil |
 |-------|-------|--------|
@@ -323,18 +325,57 @@ Geradas automaticamente pelo comando `seed_data`:
 | caixa@toca.com | 123456 | CAIXA |
 | recepcao@toca.com | 123456 | RECEPCAO |
 
-> ⚠️ **Altere todas as senhas em produção!**
+> Em produção (`DEBUG=False`) nenhum desses usuários é criado: o admin inicial vem de
+> `ADMIN_EMAIL`/`ADMIN_PASSWORD` (senha forte obrigatória). Para achar contas antigas
+> ainda com senha padrão: `python manage.py check_default_passwords [--disable]`.
 
 ---
 
 ## 🔒 Segurança
 
-- Senhas armazenadas com hash PBKDF2 (Django padrão)
-- Autenticação via JWT com refresh token blacklist
-- Proteção CORS configurável via variável de ambiente
-- Rate limiting configurado via DRF throttle classes
-- Validação de permissões por perfil em todos os endpoints
-- Variáveis sensíveis via `.env` (nunca versionadas)
+- Senhas com hash PBKDF2; validação de senha forte no cadastro e na troca
+- JWT (access 15 min) com rotação e blacklist do refresh; troca de senha/desativação derruba as sessões
+- Login com limite anti força bruta por IP (10/min) e por e-mail (20/h)
+- Permissões por perfil em todos os endpoints (testadas numa matriz endpoint × perfil)
+- Conta só é finalizada/cancelada/reaberta pelo caixa ou gerência; pagamento precisa ser > 0
+- Em produção: `SECRET_KEY` obrigatória, cookies seguros, HSTS, CSP, `X-Frame-Options: DENY`,
+  admin do Django em caminho secreto (`ADMIN_URL`), Postgres só na rede interna do Docker
+- Contêineres sem root, sistema de arquivos somente leitura e sem capabilities
+
+### Testes
+
+```bash
+# Caixa branca (unitários/integração, Postgres)
+cd backend && python manage.py test
+
+# Caixa preta (só HTTP, contra qualquer ambiente)
+python3 deploy/tests/blackbox.py https://SEU-DOMINIO --admin EMAIL --password SENHA \
+  --http http://SEU-DOMINIO --admin-path SEU_ADMIN_URL --db-host IP_DA_VM
+
+# Failover do balanceador (derruba um backend no meio do tráfego)
+python3 deploy/tests/failover.py https://SEU-DOMINIO
+```
+
+---
+
+## ☁️ Produção (VM Oracle Always Free)
+
+Tudo numa VM gratuita: Caddy (HTTPS automático + frontend + balanceador) → 2 backends
+gunicorn → Postgres interno, com backup diário. Arquivos em [`deploy/`](deploy/).
+
+```bash
+# 1. Na VM (Ubuntu), uma vez:
+git clone <repo> toca-do-espanhol && cd toca-do-espanhol/deploy
+bash setup-vm.sh          # Docker, firewall, fail2ban, SSH só com chave, updates automáticos
+# 2. No console da Oracle: libere TCP 80/443 e UDP 443 na Security List da VCN.
+# 3. Configure e suba:
+cp .env.prod.example .env.prod && nano .env.prod
+./deploy.sh               # build + migrate + rolling restart (sem downtime)
+# 4. (Opcional) Migrar dados de outro Postgres:
+./restore.sh arquivo.dump
+```
+
+Backups ficam em `deploy/backups/` (7 dias). App mobile: `EXPO_PUBLIC_API_URL=https://SEU-DOMINIO/api`.
 
 ---
 

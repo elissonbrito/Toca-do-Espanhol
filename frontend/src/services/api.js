@@ -144,7 +144,16 @@ export const fiscalAPI = {
   buildFromOrder: (orderId) => api.post(`/fiscal/nfce/from-order/${orderId}/`),
   sign: (id) => api.post(`/fiscal/nfce/${id}/sign/`),
   transmit: (id) => api.post(`/fiscal/nfce/${id}/transmit/`),
-  xmlUrl: (id) => `${BASE_URL}/fiscal/nfce/${id}/xml/`,
+  // Baixa via axios (leva o JWT no header) — um <a href> direto daria 401.
+  downloadXml: async (id) => {
+    const { data } = await api.get(`/fiscal/nfce/${id}/xml/`, { responseType: 'blob' })
+    const url = URL.createObjectURL(data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `nfce-${id}.xml`
+    a.click()
+    URL.revokeObjectURL(url)
+  },
 }
 
 // ─── Dashboard ─────────────────────────────────────────

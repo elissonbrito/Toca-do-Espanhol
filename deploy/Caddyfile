@@ -1,0 +1,60 @@
+{
+	servers {
+		# Só o Caddy fala com a internet; ninguém forja X-Forwarded-For.
+		trusted_proxies static private_ranges
+	}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Cabeçalhos de segurança para tudo que sai daqui.
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "same-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		# QZ Tray (impressão térmica) conversa com o PC local via WebSocket.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' wss://localhost:* ws://localhost:* wss://127.0.0.1:* ws://127.0.0.1:*; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+		-Server
+		-Via
+	}
+
+	# Corpo de requisição máximo (a API só trafega JSON pequeno).
+	request_body {
+		max_size 2MB
+	}
+
+	# API, admin, estáticos do Django e health -> backends, com balanceamento.
+	@backend path /api/* /{$ADMIN_URL:admin}/* /static/* /health/
+	handle @backend {
+		reverse_proxy backend1:8000 backend2:8000 {
+			lb_policy least_conn
+			lb_retries 2
+			lb_try_duration 5s
+			health_uri /health/
+			health_headers {
+				Host {$DOMAIN}
+			}
+			health_interval 10s
+			health_timeout 3s
+			fail_duration 30s
+		}
+	}
+
+	# SPA: qualquer outra rota cai no index.html (React Router).
+	handle {
+		root * /srv
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		try_files {path} /index.html
+		file_server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

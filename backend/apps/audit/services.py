@@ -1,15 +1,24 @@
 """
 Audit service - registro centralizado de ações.
 """
+from django.conf import settings
 
 
 def client_ip(request):
-    """Extrai o IP do cliente respeitando proxy reverso."""
+    """Extrai o IP do cliente respeitando proxy reverso.
+
+    Usa o IP que o NOSSO proxy anexou (o N-ésimo a partir da direita, N =
+    NUM_PROXIES): o primeiro item do X-Forwarded-For é enviado pelo cliente
+    e pode ser forjado.
+    """
     if request is None:
         return None
     forwarded = request.META.get('HTTP_X_FORWARDED_FOR')
-    if forwarded:
-        return forwarded.split(',')[0].strip()
+    num_proxies = settings.REST_FRAMEWORK.get('NUM_PROXIES') or 0
+    if forwarded and num_proxies:
+        addrs = [a.strip() for a in forwarded.split(',') if a.strip()]
+        if addrs:
+            return addrs[-min(num_proxies, len(addrs))]
     return request.META.get('REMOTE_ADDR')
 
 

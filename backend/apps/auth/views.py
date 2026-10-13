@@ -12,6 +12,7 @@ from rest_framework_simplejwt.views import TokenRefreshView as _TokenRefreshView
 from apps.users.serializers import UserSerializer
 from .serializers import LoginSerializer, LogoutSerializer
 from .services import AuthService
+from .throttles import LoginRateThrottle, LoginEmailRateThrottle, RefreshRateThrottle
 
 User = get_user_model()
 
@@ -19,6 +20,7 @@ User = get_user_model()
 class LoginView(APIView):
     """POST /api/auth/login/ -> { access, refresh, user }"""
     permission_classes = [AllowAny]
+    throttle_classes = [LoginRateThrottle, LoginEmailRateThrottle]
 
     def post(self, request):
         serializer = LoginSerializer(data=request.data, context={'request': request})
@@ -32,6 +34,7 @@ class LoginView(APIView):
 class TokenRefreshView(_TokenRefreshView):
     """POST /api/auth/refresh/ -> { access[, refresh] } (SimpleJWT padrão)."""
     permission_classes = [AllowAny]
+    throttle_classes = [RefreshRateThrottle]
 
 
 class LogoutView(APIView):

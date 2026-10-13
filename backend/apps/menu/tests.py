@@ -18,7 +18,7 @@ def _item(**over):
 
 class GtinTests(APITestCase):
     def test_valid_and_invalid_gtin(self):
-        self.assertTrue(gtin_is_valid('7891910000147'))
+        self.assertTrue(gtin_is_valid('7891910000142'))
         self.assertFalse(gtin_is_valid('7891910000140'))
         self.assertFalse(gtin_is_valid('123'))
 
@@ -29,7 +29,9 @@ class FiscalConferenceTests(APITestCase):
         cls.cat = MenuCategory.objects.create(name='Parrilla')
 
     def _make(self, **over):
-        return MenuItem.objects.create(category=self.cat, **_item(**over))
+        item = MenuItem.objects.create(category=self.cat, **_item(**over))
+        item.refresh_from_db()  # price vem como Decimal do banco, não a string do create
+        return item
 
     def test_item_conforme(self):
         r = FiscalConferenceService.check_item(self._make())
@@ -89,3 +91,23 @@ class MenuApiTests(APITestCase):
         r = self.client.get('/api/menu/items/fiscal_report/')
         self.assertEqual(r.status_code, 200)
         self.assertIn('conformes', r.data)
+
+
+class SeedMenuTests(APITestCase):
+    def test_seed_is_idempotent(self):
+        from io import StringIO
+        from django.core.management import call_command
+        call_command('seed_menu', stdout=StringIO())
+        total = MenuItem.objects.count()
+        self.assertGreater(total, 0)
+        call_command('seed_menu', stdout=StringIO())
+        self.assertEqual(MenuItem.objects.count(), total)
+
+    def test_if_empty_does_not_resurrect_deleted_items(self):
+        from io import StringIO
+        from django.core.management import call_command
+        call_command('seed_menu', stdout=StringIO())
+        total = MenuItem.objects.count()
+        MenuItem.objects.order_by('id').first().delete()
+        call_command('seed_menu', '--if-empty', stdout=StringIO())
+        self.assertEqual(MenuItem.objects.count(), total - 1)

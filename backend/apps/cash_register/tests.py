@@ -129,3 +129,20 @@ class CashRegisterTests(APITestCase):
                              {'final_amount': '160.00'}, format='json')
         self.assertEqual(r.status_code, 200)
         self.assertEqual(CashRegister.objects.get(pk=reg_id).status, CashRegisterStatus.FECHADO)
+
+    def test_zero_negative_or_invalid_amount_rejected(self):
+        self._open_register()
+        order = self._order(80)
+        for bad in ('0', '0.00', '-80.00', 'NaN', 'Infinity', 'abc'):
+            r = self.client.post('/api/cash-register/payments/',
+                                 {'order': order.id, 'amount': bad, 'payment_method': 'PIX'}, format='json')
+            self.assertEqual(r.status_code, 400, bad)
+        order.refresh_from_db()
+        self.assertNotEqual(order.status, OrderStatus.FINALIZADO)
+
+    def test_invalid_payment_method_rejected(self):
+        self._open_register()
+        order = self._order(80)
+        r = self.client.post('/api/cash-register/payments/',
+                             {'order': order.id, 'amount': '80.00', 'payment_method': 'FIADO'}, format='json')
+        self.assertEqual(r.status_code, 400)

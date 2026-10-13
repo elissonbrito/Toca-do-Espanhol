@@ -1,0 +1,127 @@
+# Produção — Toca do Espanhol (VM Oracle Always Free).
+#
+#   internet ──443──> web (Caddy: HTTPS + frontend + balanceador)
+#                        ├──> backend1 (gunicorn)
+#                        └──> backend2 (gunicorn)  ──> db (Postgres, rede interna)
+#
+# Uso:  cd deploy && cp .env.prod.example .env.prod  (preencha)  &&  ./deploy.sh
+
+name: toca
+
+x-backend: &backend
+  build:
+    context: ../backend
+  image: toca-backend:latest
+  restart: unless-stopped
+  env_file: .env.prod
+  environment:
+    DEBUG: "False"
+    DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    ALLOWED_HOSTS: ${DOMAIN},localhost,127.0.0.1,backend1,backend2
+    NUM_PROXIES: "1"
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+  networks: [internal]
+  read_only: true
+  tmpfs: [/tmp]
+  security_opt: ["no-new-privileges:true"]
+  cap_drop: [ALL]
+  mem_limit: ${BACKEND_MEM_LIMIT:-768m}
+  logging: &logging
+    driver: json-file
+    options: {max-size: "10m", max-file: "5"}
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    env_file: .env.prod
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Sem "ports": o banco só existe na rede interna do Docker.
+    networks: [internal]
+    shm_size: 128mb
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging: *logging
+
+  # Roda uma vez a cada deploy, antes dos backends (evita 2 migrates em paralelo).
+  migrate:
+    <<: *backend
+    restart: "no"
+    command: >
+      sh -c "python manage.py migrate --no-input &&
+             python manage.py createcachetable &&
+             python manage.py seed_data &&
+             python manage.py seed_menu --if-empty &&
+             python manage.py check --deploy --fail-level ERROR &&
+             python manage.py check_default_passwords"
+    depends_on:
+      db:
+        condition: service_healthy
+    read_only: false
+
+  backend1: *backend
+  backend2: *backend
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+    image: toca-web:latest
+    restart: unless-stopped
+    env_file: .env.prod
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+      - "${HTTPS_PORT:-443}:443/udp"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [internal, public]
+    depends_on: [backend1, backend2]
+    security_opt: ["no-new-privileges:true"]
+    logging: *logging
+
+  # Backup diário do banco (mantém os últimos BACKUP_KEEP_DAYS dias).
+  backup:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    env_file: .env.prod
+    environment:
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
+    volumes:
+      - ./backups:/backups
+    networks: [internal]
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        umask 077   # dump do banco só legível pelo dono
+        while true; do
+          f=/backups/toca-$$(date +%Y%m%d-%H%M%S).dump
+          if pg_dump -Fc -f "$$f.tmp"; then mv "$$f.tmp" "$$f"; echo "backup ok: $$f"; else rm -f "$$f.tmp"; echo "BACKUP FALHOU"; fi
+          find /backups -name 'toca-*.dump' -mtime +$${BACKUP_KEEP_DAYS:-7} -delete
+          sleep 86400
+        done
+    logging: *logging
+
+networks:
+  internal:
+    internal: true   # sem acesso direto à internet
+  public: {}
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

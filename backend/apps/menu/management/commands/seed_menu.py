@@ -10,6 +10,8 @@ Idempotente: usa get_or_create por SKU, então rodar de novo não duplica nem
 sobrescreve o que já foi ajustado (inclusive os dados fiscais do contador).
 
 Uso: python manage.py seed_menu
+     python manage.py seed_menu --if-empty   # produção: só popula cardápio vazio
+                                             # (não ressuscita itens apagados)
 """
 from django.core.management.base import BaseCommand
 
@@ -93,7 +95,14 @@ CARDAPIO = [
 class Command(BaseCommand):
     help = 'Popula o cardápio (exemplos + cardápio real). Idempotente.'
 
+    def add_arguments(self, parser):
+        parser.add_argument('--if-empty', action='store_true',
+                            help='Só popula se ainda não houver nenhum item no cardápio.')
+
     def handle(self, *args, **options):
+        if options['if_empty'] and MenuItem.objects.exists():
+            self.stdout.write('ℹ️  Cardápio já existe — nada a fazer (--if-empty).')
+            return
         cats = {}
         for nome, ordem in CATEGORIAS:
             cat, _ = MenuCategory.objects.get_or_create(name=nome, defaults={'display_order': ordem})

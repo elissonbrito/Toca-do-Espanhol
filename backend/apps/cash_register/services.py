@@ -86,10 +86,14 @@ class PaymentService:
         if order.table_id is None:
             raise ValidationError({'order': 'Comanda de senha sem mesa — destine a senha a uma mesa antes.'})
 
+        amount = _to_decimal(amount, 'amount')
+        if not amount.is_finite() or amount <= 0:
+            raise ValidationError({'amount': 'Informe um valor maior que zero.'})
+
         payment = Payment.objects.create(
             order=order,
             cash_register=register,
-            amount=_to_decimal(amount, 'amount'),
+            amount=amount,
             payment_method=payment_method,
             received_by=received_by,
             observations=observations,

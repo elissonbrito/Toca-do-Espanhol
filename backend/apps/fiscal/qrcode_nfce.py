@@ -27,7 +27,9 @@ def build_qrcode(*, chave: str, tp_amb: str, csc_id: str, csc_token: str, uf: st
     """Retorna a URL completa do QR Code (modo online)."""
     base_url = URL_CONSULTA_QRCODE_HOMOLOG.get(uf.upper(), 'https://www.example-sefaz.gov.br/nfce/qrcode')
     params_sem_hash = f'{chave}|{VERSAO_QRCODE}|{tp_amb}|{csc_id}'
-    digest = hashlib.sha1((params_sem_hash + (csc_token or '')).encode()).hexdigest().upper()
+    # SHA-1 é imposto pelo leiaute do QR Code NFC-e (SEFAZ), não é escolha nossa.
+    digest = hashlib.sha1((params_sem_hash + (csc_token or "")).encode(),
+                          usedforsecurity=False).hexdigest().upper()
     p = f'{params_sem_hash}|{digest}'
     sep = '&' if '?' in base_url else '?'
     return f'{base_url}{sep}p={p}'

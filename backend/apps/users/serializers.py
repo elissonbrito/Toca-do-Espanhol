@@ -23,7 +23,8 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['name', 'email', 'password', 'password_confirm', 'role']
+        fields = ['id', 'name', 'email', 'password', 'password_confirm', 'role']
+        read_only_fields = ['id']
 
     def validate(self, attrs):
         if attrs['password'] != attrs.pop('password_confirm'):
@@ -49,11 +50,13 @@ class UserUpdateSerializer(serializers.ModelSerializer):
 
 class ChangePasswordSerializer(serializers.Serializer):
     """Serializer for changing password."""
-    old_password = serializers.CharField(write_only=True)
+    old_password = serializers.CharField(write_only=True, required=False)
     new_password = serializers.CharField(write_only=True, validators=[validate_password])
     new_password_confirm = serializers.CharField(write_only=True)
 
     def validate(self, attrs):
+        if self.context.get('require_old', True) and not attrs.get('old_password'):
+            raise serializers.ValidationError({'old_password': 'Informe a senha atual.'})
         if attrs['new_password'] != attrs['new_password_confirm']:
             raise serializers.ValidationError({'new_password_confirm': 'As senhas não coincidem.'})
         return attrs

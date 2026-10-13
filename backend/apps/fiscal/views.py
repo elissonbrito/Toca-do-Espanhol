@@ -2,7 +2,6 @@ from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
 from rest_framework.decorators import api_view, permission_classes as perm_classes
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -37,11 +36,6 @@ class InvoiceViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = InvoiceSerializer
     permission_classes = [IsCaixa]
     filterset_fields = ['status', 'ambiente']
-
-    def get_permissions(self):
-        if self.action in ['list', 'retrieve', 'xml']:
-            return [IsAuthenticated()]
-        return [IsCaixa()]
 
     def _log(self, request, invoice, details):
         AuditService.log(user=request.user, action='UPDATE', entity='Invoice',
@@ -90,7 +84,7 @@ def transmit_invoice(request, pk):
 
 
 @api_view(['GET'])
-@perm_classes([IsAuthenticated])
+@perm_classes([IsCaixa])
 def invoice_xml(request, pk):
     invoice = get_object_or_404(Invoice, pk=pk)
     xml = invoice.xml_assinado or invoice.xml or ''

@@ -1,7 +1,7 @@
 """
 Orquestração da NFC-e: gerar rascunho a partir do pedido, assinar, transmitir.
 """
-import random
+import secrets
 from decimal import Decimal
 
 from django.db import transaction
@@ -38,7 +38,7 @@ class NFCeService:
 
         numero = settings.proximo_numero
         serie = settings.serie_nfce
-        codigo = f'{random.randint(0, 99999999):08d}'
+        codigo = f"{secrets.randbelow(100_000_000):08d}"
 
         invoice = Invoice(
             order=order, numero=numero, serie=serie, codigo_numerico=codigo,

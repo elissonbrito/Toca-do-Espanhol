@@ -12,7 +12,9 @@ class LoginSerializer(serializers.Serializer):
     """Valida credenciais e resolve o usuário autenticado em ``validated_data['user']``.
 
     Campos ausentes/malformados -> 400 (ValidationError).
-    Credenciais inválidas -> 401. Conta inativa -> 403.
+    Credenciais inválidas ou conta inativa -> 401 (resposta genérica, não
+    revela se a conta existe). O 403 abaixo é só defesa extra caso outro
+    backend de autenticação aceite usuário inativo.
     """
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, style={'input_type': 'password'})

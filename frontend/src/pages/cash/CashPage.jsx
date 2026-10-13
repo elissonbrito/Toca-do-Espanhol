@@ -190,10 +190,10 @@ export default function CashPage() {
           {lastInvoice.chave_acesso && (
             <span className="text-brand-muted text-xs font-mono">{lastInvoice.chave_acesso}</span>
           )}
-          <a href={fiscalAPI.xmlUrl(lastInvoice.id)} target="_blank" rel="noreferrer"
+          <button type="button" onClick={() => fiscalAPI.downloadXml(lastInvoice.id).catch(() => toast.error('Erro ao baixar o XML'))}
             className="text-brand-gold text-xs inline-flex items-center gap-1 hover:underline">
             <Download size={12} /> XML
-          </a>
+          </button>
         </div>
       )}
 

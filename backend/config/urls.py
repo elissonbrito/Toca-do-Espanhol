@@ -1,6 +1,7 @@
 """
 URL Configuration for Toca do Espanhol.
 """
+from django.conf import settings
 from django.contrib import admin
 from django.urls import path, include
 from django.http import JsonResponse
@@ -11,7 +12,7 @@ def health_check(request):
 
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path(settings.ADMIN_URL, admin.site.urls),
     path('health/', health_check),
     path('api/auth/', include('apps.auth.urls')),
     path('api/users/', include('apps.users.urls')),

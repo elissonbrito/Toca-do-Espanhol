@@ -9,6 +9,7 @@ from .serializers import QueueTicketSerializer, QueueTicketCreateSerializer, Que
 from .services import QueueService, PRIORITY_RANK_CASE
 from apps.users.permissions import IsManager, IsRecepcao, IsFloorStaff
 from apps.audit.services import AuditService
+from apps.utils import parse_id
 
 
 class QueueTicketViewSet(viewsets.ModelViewSet):
@@ -141,7 +142,7 @@ class QueueTicketViewSet(viewsets.ModelViewSet):
         from apps.tables.models import Table
 
         ticket = self.get_object()
-        table = Table.objects.filter(pk=request.data.get('table')).first()
+        table = Table.objects.filter(pk=parse_id(request.data.get('table'))).first()
         if table is None:
             return Response({'table': 'Mesa não encontrada.'}, status=400)
         open_order = request.data.get('open_order', True)

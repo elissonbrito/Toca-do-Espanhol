@@ -76,3 +76,5 @@ class OrderCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Order
         fields = ['table', 'customer_name', 'people_count', 'observations']
+        # Comanda sem mesa só nasce pela fila (QueueService.open_order_for_ticket).
+        extra_kwargs = {'table': {'required': True, 'allow_null': False}}

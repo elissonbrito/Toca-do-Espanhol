@@ -16,6 +16,7 @@ from apps.users.permissions import (
     IsManager, IsFloorStaff, IsFloorStaffOrCaixa, IsCaixa, IsCaixaOrAdmin,
 )
 from apps.audit.services import AuditService
+from apps.utils import parse_id
 
 CAIXA_ROLES = {'CAIXA', 'ADM_MAXIMO', 'GERENTE'}
 
@@ -96,7 +97,7 @@ class OrderViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['delete'], url_path='items/(?P<item_id>[^/.]+)')
     def remove_item(self, request, pk=None, item_id=None):
         order = self.get_object()
-        item = order.items.filter(pk=item_id).first()
+        item = order.items.filter(pk=parse_id(item_id)).first()
         if item is None:
             return Response({'detail': 'Item não encontrado.'}, status=404)
         OrderService.cancel_item(order, item, removed_by=request.user)
@@ -112,7 +113,7 @@ class OrderViewSet(viewsets.ModelViewSet):
     def transfer_table(self, request, pk=None):
         order = self.get_object()
         from apps.tables.models import Table
-        new_table = Table.objects.filter(pk=request.data.get('table')).first()
+        new_table = Table.objects.filter(pk=parse_id(request.data.get('table'))).first()
         if new_table is None:
             return Response({'table': 'Mesa não encontrada.'}, status=400)
         order, old_table = OrderService.transfer_table(order, new_table)
@@ -127,7 +128,7 @@ class OrderViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='transfer-items')
     def transfer_items(self, request, pk=None):
         source = self.get_object()
-        target = Order.objects.filter(pk=request.data.get('target_order')).first()
+        target = Order.objects.filter(pk=parse_id(request.data.get('target_order'))).first()
         if target is None:
             return Response({'target_order': 'Comanda de destino não encontrada.'}, status=400)
         items = OrderService.transfer_items(source, target, request.data.get('items'))
@@ -165,9 +166,17 @@ class OrderViewSet(viewsets.ModelViewSet):
     def update_status(self, request, pk=None):
         order = self.get_object()
         new_status = request.data.get('status')
-        if (new_status == OrderStatus.CANCELADO
-                and request.user.role not in CAIXA_ROLES):
+        is_caixa = request.user.role in CAIXA_ROLES
+        if new_status == OrderStatus.CANCELADO and not is_caixa:
             raise PermissionDenied('Apenas o caixa ou a gerência podem cancelar a conta.')
+        # Finalizar sem passar pelo caixa = conta "paga" sem pagamento registrado.
+        if new_status == OrderStatus.FINALIZADO and not is_caixa:
+            raise PermissionDenied('Apenas o caixa ou a gerência podem finalizar a conta.')
+        # Reabrir conta já encerrada mexe em valores fechados.
+        if order.status in (OrderStatus.FINALIZADO, OrderStatus.CANCELADO) and not is_caixa:
+            raise PermissionDenied('Conta encerrada — só o caixa ou a gerência podem alterá-la.')
+        if new_status == OrderStatus.FECHAMENTO:
+            return Response({'status': 'Use o endpoint close_bill para fechar a conta.'}, status=400)
         old_status, order = OrderService.change_status(order, new_status)
         AuditService.log(
             user=request.user, action='UPDATE', entity='Order', entity_id=order.id,
